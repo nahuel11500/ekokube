@@ -19,12 +19,21 @@ interface Props {
   sortBy: string
   order: 'asc' | 'desc'
   onSort: (sortKey: string) => void
+  onRowClick?: (row: Record<string, unknown>) => void
   maxHeight?: number
 }
 
 const ROW_HEIGHT = 33
 
-export function DataTable({ columns, rows, sortBy, order, onSort, maxHeight = 560 }: Props) {
+export function DataTable({
+  columns,
+  rows,
+  sortBy,
+  order,
+  onSort,
+  onRowClick,
+  maxHeight = 560,
+}: Props) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -60,8 +69,9 @@ export function DataTable({ columns, rows, sortBy, order, onSort, maxHeight = 56
             return (
               <div
                 key={item.key}
-                className="dtable-row"
+                className={`dtable-row ${onRowClick ? 'link' : ''}`}
                 style={{ ...grid, transform: `translateY(${item.start}px)`, height: ROW_HEIGHT }}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {columns.map((c) => (
                   <div key={c.key} className={`cell ${c.numeric ? 'num' : ''}`}>

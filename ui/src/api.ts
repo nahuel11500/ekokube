@@ -72,6 +72,8 @@ export interface NodesResponse {
 
 export interface QueryOpts {
   namespace?: string
+  workload?: string
+  entity?: 'namespace' | 'workload'
   sort_by?: string
   order?: 'asc' | 'desc'
   limit?: number
@@ -147,8 +149,46 @@ export function tenantsCsvUrl(range: TimeRange, costs: Costs): string {
   return `/api/tenants/export.csv?${params}`
 }
 
+export interface TimeseriesResponse {
+  step: number
+  ts: number[]
+  cpu_usage_millicores: number[]
+  cpu_request_millicores: number[]
+  cpu_limit_millicores: number[]
+  mem_working_set_bytes: number[]
+  mem_request_bytes: number[]
+  mem_limit_bytes: number[]
+}
+
+export interface PodsResponse {
+  pod_name: string[]
+  node: string[]
+  qos: string[]
+  runtime_secs: number[]
+  cpu_usage_avg_millicores: number[]
+  cpu_p95_millicores: number[]
+  cpu_request_millicores: number[]
+  cpu_limit_millicores: number[]
+  cpu_throttled_max_ratio: number[]
+  mem_usage_avg_bytes: number[]
+  mem_max_bytes: number[]
+  mem_request_bytes: number[]
+  psi_cpu_max_ratio: number[]
+  psi_mem_max_ratio: number[]
+  has_more: boolean
+}
+
+export interface SparklineSeries {
+  key: string
+  ts: number[]
+  cpu_millicores: number[]
+}
+
 export const api = {
   overview: (r: TimeRange) => get<OverviewResponse>('/api/overview', r),
+  timeseries: (r: TimeRange, o?: QueryOpts) => get<TimeseriesResponse>('/api/timeseries', r, o),
+  pods: (r: TimeRange, o?: QueryOpts) => get<PodsResponse>('/api/pods', r, o),
+  sparklines: (r: TimeRange, o?: QueryOpts) => get<SparklineSeries[]>('/api/sparklines', r, o),
   namespaces: (r: TimeRange, o?: QueryOpts) => get<NamespacesResponse>('/api/namespaces', r, o),
   workloads: (r: TimeRange, o?: QueryOpts) => get<WorkloadsResponse>('/api/workloads', r, o),
   nodes: (r: TimeRange) => get<NodesResponse>('/api/nodes', r),

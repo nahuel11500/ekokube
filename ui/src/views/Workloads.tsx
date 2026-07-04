@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { api, toRows, type TimeRange } from '../api'
 import { useApi } from '../hooks'
 import { fmtBytes, fmtCores, fmtPercent } from '../format'
+import { navigate, routeHref } from '../router'
+import { Badge } from '../components/Badge'
 import { DataTable, type Column } from '../components/DataTable'
 
 const COLUMNS: Column[] = [
@@ -9,14 +11,21 @@ const COLUMNS: Column[] = [
     key: 'workload_name',
     label: 'Workload',
     width: 'minmax(180px, 1.6fr)',
-    sortKey: undefined,
     render: (r) => (
       <>
-        {String(r.workload_name)} <span className="dim">{String(r.workload_kind)}</span>
+        <a href={routeHref(['namespaces', String(r.namespace), 'workloads', String(r.workload_name)])}>
+          {String(r.workload_name)}
+        </a>{' '}
+        <span className="dim">{String(r.workload_kind)}</span>
       </>
     ),
   },
-  { key: 'namespace', label: 'Namespace', width: 'minmax(120px, 1fr)' },
+  {
+    key: 'namespace',
+    label: 'Namespace',
+    width: 'minmax(120px, 1fr)',
+    render: (r) => <a href={routeHref(['namespaces', String(r.namespace)])}>{String(r.namespace)}</a>,
+  },
   { key: 'pods', label: 'Pods', width: '60px', numeric: true, sortKey: 'pods' },
   {
     key: 'cpu_usage_avg_millicores',
@@ -52,11 +61,20 @@ const COLUMNS: Column[] = [
   },
   {
     key: 'cpu_throttled_max_ratio',
-    label: 'Throttle max',
+    label: 'Throttle',
     width: 'minmax(95px, 1fr)',
     numeric: true,
     sortKey: 'cpu_throttled_max',
-    render: (r) => fmtPercent(r.cpu_throttled_max_ratio as number),
+    render: (r) => {
+      const v = r.cpu_throttled_max_ratio as number
+      return v > 0.25 ? (
+        <Badge level="serious" title="CPU-starved: raise limits or spread load">
+          {fmtPercent(v)}
+        </Badge>
+      ) : (
+        fmtPercent(v)
+      )
+    },
   },
   {
     key: 'mem_usage_avg_bytes',
@@ -88,29 +106,27 @@ const COLUMNS: Column[] = [
     width: 'minmax(75px, 1fr)',
     numeric: true,
     sortKey: 'psi_cpu_max',
-    render: (r) => fmtPercent(r.psi_cpu_max_ratio as number),
+    render: (r) => {
+      const v = r.psi_cpu_max_ratio as number
+      return v > 0.1 ? (
+        <Badge level="warning" title="CPU pressure stalls detected">
+          {fmtPercent(v)}
+        </Badge>
+      ) : (
+        fmtPercent(v)
+      )
+    },
   },
 ]
 
 const ROW_KEYS = COLUMNS.map((c) => c.key).concat(['workload_kind'])
 
-export function Workloads({ range }: { range: TimeRange }) {
+export function WorkloadsTable({ range, namespace }: { range: TimeRange; namespace?: string }) {
   const [sortBy, setSortBy] = useState('cpu_waste')
   const [order, setOrder] = useState<'asc' | 'desc'>('desc')
-  const [namespace, setNamespace] = useState('')
 
-  const namespaces = useApi(
-    () => api.namespaces(range, { sort_by: 'namespace', order: 'asc', limit: 500 }),
-    [range.from, range.to],
-  )
   const { data, error, loading } = useApi(
-    () =>
-      api.workloads(range, {
-        sort_by: sortBy,
-        order,
-        limit: 500,
-        namespace: namespace || undefined,
-      }),
+    () => api.workloads(range, { sort_by: sortBy, order, limit: 500, namespace }),
     [range.from, range.to, sortBy, order, namespace],
   )
 
@@ -123,7 +139,28 @@ export function Workloads({ range }: { range: TimeRange }) {
   }
 
   if (error) return <div className="error">{error}</div>
+  if (loading && !data) return <div className="skeleton" style={{ height: 200 }} />
   const rows = data ? toRows(data, ROW_KEYS) : []
+  return (
+    <DataTable
+      columns={COLUMNS}
+      rows={rows}
+      sortBy={sortBy}
+      order={order}
+      onSort={onSort}
+      onRowClick={(r) =>
+        navigate(['namespaces', String(r.namespace), 'workloads', String(r.workload_name)])
+      }
+    />
+  )
+}
+
+export function Workloads({ range }: { range: TimeRange }) {
+  const [namespace, setNamespace] = useState('')
+  const namespaces = useApi(
+    () => api.namespaces(range, { sort_by: 'namespace', order: 'asc', limit: 500 }),
+    [range.from, range.to],
+  )
 
   return (
     <div className="card">
@@ -138,14 +175,10 @@ export function Workloads({ range }: { range: TimeRange }) {
           ))}
         </select>
         <span className="dim">
-          Waste = requested − actually used (average over the selected range)
+          Waste = requested − actually used (average over the observed window)
         </span>
       </div>
-      {loading && !data ? (
-        <div className="loading">Loading…</div>
-      ) : (
-        <DataTable columns={COLUMNS} rows={rows} sortBy={sortBy} order={order} onSort={onSort} />
-      )}
+      <WorkloadsTable range={range} namespace={namespace || undefined} />
     </div>
   )
 }

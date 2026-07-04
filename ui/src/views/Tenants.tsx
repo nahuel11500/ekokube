@@ -13,6 +13,7 @@ import {
 } from '../api'
 import { useApi } from '../hooks'
 import { fmtHours } from '../format'
+import { useSettings } from '../settings'
 import { DataTable, type Column } from '../components/DataTable'
 
 const EMPTY_RULE: TenantRule = {
@@ -21,16 +22,6 @@ const EMPTY_RULE: TenantRule = {
   match_value: '',
   tenant_source: 'label_value',
   tenant_name: '',
-}
-
-function loadCosts(): Costs {
-  try {
-    const stored = localStorage.getItem('ekokube-costs')
-    if (stored) return JSON.parse(stored)
-  } catch {
-    /* fall through */
-  }
-  return { cost_core_hour: 0.05, cost_gib_hour: 0.01 }
 }
 
 const TENANT_COLUMNS: Column[] = [
@@ -161,15 +152,15 @@ function RuleEditor({
 }
 
 export function Tenants({ range }: { range: TimeRange }) {
-  const [costs, setCosts] = useState<Costs>(loadCosts)
+  const settings = useSettings()
+  const costs: Costs = {
+    cost_core_hour: settings.costCoreHour,
+    cost_gib_hour: settings.costGibHour,
+  }
   const [rules, setRules] = useState<TenantRule[] | null>(null)
   const [dirty, setDirty] = useState(false)
   const [preview, setPreview] = useState<TenantStat[] | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-
-  useEffect(() => {
-    localStorage.setItem('ekokube-costs', JSON.stringify(costs))
-  }, [costs])
 
   useEffect(() => {
     api.getRules().then(setRules).catch((e) => setSaveError(String(e)))
@@ -222,26 +213,7 @@ export function Tenants({ range }: { range: TimeRange }) {
       <div className="card">
         <h3>Tenants — consumption &amp; chargeback</h3>
         <div className="table-toolbar">
-          <label>
-            €/core-hour{' '}
-            <input
-              type="number"
-              step="0.001"
-              style={{ width: 80 }}
-              value={costs.cost_core_hour}
-              onChange={(e) => setCosts({ ...costs, cost_core_hour: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            €/GiB-hour{' '}
-            <input
-              type="number"
-              step="0.001"
-              style={{ width: 80 }}
-              value={costs.cost_gib_hour}
-              onChange={(e) => setCosts({ ...costs, cost_gib_hour: Number(e.target.value) })}
-            />
-          </label>
+          <span className="dim">Rates: €{costs.cost_core_hour}/core-h · €{costs.cost_gib_hour}/GiB-h (change in ⚙ Settings)</span>
           <div className="spacer" />
           <a className="btn" href={tenantsCsvUrl(range, costs)} download>
             Export CSV

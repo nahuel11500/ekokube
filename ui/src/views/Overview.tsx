@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { api, type TimeRange } from '../api'
 import { useApi } from '../hooks'
 import { fmtBytes, fmtCores, fmtCount } from '../format'
+import { routeHref } from '../router'
+import { useSettings } from '../settings'
 import { TimeSeriesChart, type ChartSeries } from '../components/TimeSeriesChart'
 
 /** Joins two bucket-aligned series sets on their union of timestamps. */
@@ -118,14 +120,24 @@ export function Overview({ range }: { range: TimeRange }) {
 }
 
 function TopNamespaces({ range }: { range: TimeRange }) {
+  const settings = useSettings()
   const { data } = useApi(
-    () => api.namespaces(range, { sort_by: 'cpu_usage_avg', limit: 8 }),
+    () => api.namespaces(range, { sort_by: 'cpu_usage_avg', limit: 500 }),
     [range.from, range.to],
   )
   if (!data || data.namespace.length === 0) return null
+  const coreHours = data.cpu_core_hours.reduce((a, b) => a + b, 0)
+  const gibHours = data.mem_gib_hours.reduce((a, b) => a + b, 0)
+  const cost = coreHours * settings.costCoreHour + gibHours * settings.costGibHour
   return (
     <div className="card">
-      <h3>Top namespaces by CPU</h3>
+      <h3>
+        Top namespaces by CPU
+        <span className="dim" style={{ float: 'right', fontWeight: 400 }}>
+          usage over range: {coreHours.toFixed(1)} core-h · {gibHours.toFixed(1)} GiB-h ≈ €
+          {cost.toFixed(2)}
+        </span>
+      </h3>
       <table className="mini-table">
         <thead>
           <tr>
@@ -138,9 +150,11 @@ function TopNamespaces({ range }: { range: TimeRange }) {
           </tr>
         </thead>
         <tbody>
-          {data.namespace.map((ns, i) => (
+          {data.namespace.slice(0, 8).map((ns, i) => (
             <tr key={ns}>
-              <td>{ns}</td>
+              <td>
+                <a href={routeHref(['namespaces', ns])}>{ns}</a>
+              </td>
               <td className="num">{data.pods[i]}</td>
               <td className="num">{fmtCores(data.cpu_usage_avg_millicores[i])}</td>
               <td className="num">{fmtCores(data.cpu_waste_millicores[i])}</td>
