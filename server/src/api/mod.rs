@@ -3,8 +3,10 @@ mod metrics;
 mod namespaces;
 mod nodes;
 mod overview;
+mod pods;
 mod rules;
 mod tenants;
+mod timeseries;
 mod workloads;
 
 pub use auth::BasicAuth;
@@ -44,6 +46,9 @@ pub fn router(ch: clickhouse::Client, auth: Option<BasicAuth>) -> Router {
         .route("/api/namespaces", get(namespaces::handler))
         .route("/api/workloads", get(workloads::handler))
         .route("/api/nodes", get(nodes::handler))
+        .route("/api/timeseries", get(timeseries::handler))
+        .route("/api/sparklines", get(timeseries::sparklines))
+        .route("/api/pods", get(pods::handler))
         .route("/api/tenants", get(tenants::handler))
         .route("/api/tenants/export.csv", get(tenants::export_csv))
         .route("/api/rules", get(rules::get_rules).put(rules::put_rules))
@@ -94,6 +99,7 @@ pub struct RangeQuery {
     pub from: Option<u32>,
     pub to: Option<u32>,
     pub namespace: Option<String>,
+    pub workload: Option<String>,
     pub sort_by: Option<String>,
     pub order: Option<String>,
     pub limit: Option<u32>,

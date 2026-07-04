@@ -69,6 +69,7 @@ impl TenantQuery {
             from: self.from,
             to: self.to,
             namespace: None,
+            workload: None,
             sort_by: None,
             order: None,
             limit: None,
