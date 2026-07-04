@@ -1,0 +1,339 @@
+/* ekokube theme — roles from the validated reference palette */
+:root {
+  --page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --series-1: #2a78d6; /* blue: usage */
+  --series-2: #1baf7a; /* aqua: requests */
+  --series-3: #eda100; /* yellow: limits */
+  --series-4: #008300;
+  --status-critical: #d03b3b;
+  --status-good: #0ca30c;
+  --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #199e70;
+    --series-3: #c98500;
+    --series-4: #008300;
+    --status-critical: #d03b3b;
+    --status-good: #0ca30c;
+    --accent: #3987e5;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--page);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.app-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.app-title span {
+  color: var(--accent);
+}
+.nav {
+  display: flex;
+  gap: 4px;
+}
+.nav button {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.nav button:hover {
+  background: var(--page);
+}
+.nav button.active {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: var(--page);
+}
+.spacer {
+  flex: 1;
+}
+
+.range-picker {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+}
+.range-picker button {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.range-picker button.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.main {
+  padding: 20px 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.tile {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.tile .label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.tile .value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.card h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* data table */
+.table-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.table-toolbar select,
+.table-toolbar input {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.dtable {
+  width: 100%;
+  overflow-x: auto;
+}
+.dtable-header,
+.dtable-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  min-width: fit-content;
+}
+.dtable-header {
+  border-bottom: 1px solid var(--baseline);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.dtable-header .cell {
+  padding: 8px 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.dtable-header .cell:hover {
+  color: var(--text-primary);
+}
+.dtable-header .cell.sorted {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.dtable-body {
+  overflow-y: auto;
+  position: relative;
+}
+.dtable-row {
+  border-bottom: 1px solid var(--gridline);
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+.dtable-row .cell {
+  padding: 6px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cell .dim {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mini-bar {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gridline);
+  margin-left: 8px;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.mini-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--series-1);
+  border-radius: 3px;
+}
+
+.uplot-wrap {
+  position: relative;
+}
+.u-legend {
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+}
+
+/* tenant rules editor */
+.rule-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--gridline);
+  flex-wrap: wrap;
+}
+.rule-row select,
+.rule-row input {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.rule-move {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rule-move button,
+.rule-remove {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 4px;
+}
+.rule-move button:hover,
+.rule-remove:hover {
+  color: var(--text-primary);
+}
+.rule-remove {
+  font-size: 14px;
+  margin-left: auto;
+}
+.btn {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.empty,
+.loading {
+  color: var(--text-muted);
+  padding: 30px;
+  text-align: center;
+}
+.error {
+  color: var(--status-critical);
+  padding: 12px;
+}

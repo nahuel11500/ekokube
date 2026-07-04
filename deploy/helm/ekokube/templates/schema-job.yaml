@@ -1,0 +1,92 @@
+{{- if .Values.schemaMigration.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-schema
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+{{ (.Files.Glob "schema/*.sql").AsConfig | indent 2 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-schema
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ .Values.schemaMigration.image }}
+          command:
+            - bash
+            - -ec
+            - |
+              ch() {
+                clickhouse-client \
+                  --host "{{ include "ekokube.clickhouseHost" . }}" \
+                  --port "{{ .Values.clickhouse.nativePort }}" \
+                  --user "$EKOKUBE_CLICKHOUSE_USER" \
+                  --password "$EKOKUBE_CLICKHOUSE_PASSWORD" \
+                  "$@"
+              }
+              {{- if .Values.clickhouse.ha }}
+              # HA: Replicated database engine so DDL and tables replicate
+              # across all ClickHouse replicas (the operator's database sync
+              # supports only Replicated databases).
+              CREATE_DB="CREATE DATABASE IF NOT EXISTS {{ .Values.clickhouse.database }} ENGINE = Replicated('/clickhouse/databases/{{ .Values.clickhouse.database }}', '{shard}', '{replica}')"
+              {{- else }}
+              CREATE_DB="CREATE DATABASE IF NOT EXISTS {{ .Values.clickhouse.database }}"
+              {{- end }}
+
+              # Waiting on CREATE DATABASE itself covers everything that can
+              # lag: DNS, server start, user provisioning, and the operator
+              # reconciling the user's grants.
+              echo "waiting for clickhouse (connectivity + auth + grants)"
+              for i in $(seq 1 120); do
+                if ch --query "$CREATE_DB" 2>/dev/null; then
+                  echo "database ready"
+                  break
+                fi
+                sleep 5
+              done
+              ch --query "$CREATE_DB"
+
+              for f in /schema/*.sql; do
+                echo "applying $f"
+                {{- if .Values.clickhouse.ha }}
+                # HA: promote every table to its Replicated* engine so data
+                # (not just DDL) replicates across replicas via Keeper. The
+                # transform is uniform — MergeTree -> ReplicatedMergeTree,
+                # ReplacingMergeTree(x) -> ReplicatedReplacingMergeTree(x),
+                # AggregatingMergeTree -> ReplicatedAggregatingMergeTree.
+                # (Materialized views use TO <table>, no ENGINE line, so they
+                # are untouched.) Parameterless Replicated* engines take their
+                # Keeper path/replica from the operator-configured defaults.
+                sed -E 's/ENGINE = (Replacing|Aggregating|Summing|Collapsing|VersionedCollapsing|Graphite)?MergeTree/ENGINE = Replicated\1MergeTree/g' "$f" | ch --multiquery
+                {{- else }}
+                ch --multiquery < "$f"
+                {{- end }}
+              done
+          env:
+            {{- include "ekokube.clickhouseEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+              readOnly: true
+      volumes:
+        - name: schema
+          configMap:
+            name: {{ .Release.Name }}-schema
+{{- end }}

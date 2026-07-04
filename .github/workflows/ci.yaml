@@ -1,0 +1,61 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npm run build
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/ekokube
+      - run: helm template test deploy/helm/ekokube > /dev/null
+      - run: helm template test deploy/helm/ekokube --set clickhouse.ha=true > /dev/null
+      - name: schema copies in sync
+        run: diff <(cat deploy/schema/001_init.sql deploy/schema/002_rollups.sql) <(cat deploy/helm/ekokube/schema/001_init.sql deploy/helm/ekokube/schema/002_rollups.sql)
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f agent/Dockerfile -t ekokube-agent:ci .
+      - run: docker build -f server/Dockerfile -t ekokube-server:ci .
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: ./dev/smoke-test.sh

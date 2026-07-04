@@ -1,0 +1,51 @@
+# Synthetic workloads for end-to-end verification:
+# - cpu-burner: burns CPU with a low request and a limit -> shows usage + throttling
+# - idle-hog: sleeps with huge requests -> must top the waste ranking
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loadgen
+  labels:
+    tenant: acme
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-burner
+  namespace: loadgen
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: cpu-burner }
+  template:
+    metadata:
+      labels: { app: cpu-burner, team: checkout }
+    spec:
+      containers:
+        - name: burner
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do :; done"]
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { cpu: 300m, memory: 64Mi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: idle-hog
+  namespace: loadgen
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: idle-hog }
+  template:
+    metadata:
+      labels: { app: idle-hog, team: search }
+    spec:
+      containers:
+        - name: idle
+          image: busybox:1.36
+          command: ["sleep", "infinity"]
+          resources:
+            requests: { cpu: "500m", memory: 1Gi }
+            limits: { cpu: "1", memory: 1Gi }

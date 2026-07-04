@@ -1,0 +1,31 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-agent
+  namespace: {{ .Release.Namespace }}
+---
+# Node-local kubelet API access only (/pods via nodes/proxy).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-agent
+rules:
+  - apiGroups: [""]
+    resources: ["nodes/proxy", "nodes/stats"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-agent
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-agent
+    namespace: {{ .Release.Namespace }}
+
+{{- end }}

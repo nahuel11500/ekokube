@@ -1,0 +1,84 @@
+# Dev deployment of the agent (image built locally, loaded into kind).
+# The Helm chart (deploy/helm) is the packaged equivalent.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ekokube
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ekokube-agent
+  namespace: ekokube
+---
+# Access to the node-local kubelet API (/pods) only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ekokube-agent
+rules:
+  - apiGroups: [""]
+    resources: ["nodes/proxy", "nodes/stats"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ekokube-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ekokube-agent
+subjects:
+  - kind: ServiceAccount
+    name: ekokube-agent
+    namespace: ekokube
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ekokube-agent
+  namespace: ekokube
+spec:
+  selector:
+    matchLabels: { app: ekokube-agent }
+  template:
+    metadata:
+      labels: { app: ekokube-agent }
+    spec:
+      serviceAccountName: ekokube-agent
+      tolerations:
+        - operator: Exists # run on every node, including control plane
+      containers:
+        - name: agent
+          image: ekokube-agent:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: EKOKUBE_NODE_NAME
+              valueFrom:
+                fieldRef: { fieldPath: spec.nodeName }
+            - name: EKOKUBE_NODE_IP
+              valueFrom:
+                fieldRef: { fieldPath: status.hostIP }
+            - name: EKOKUBE_KUBELET_URL
+              value: "https://$(EKOKUBE_NODE_IP):10250"
+            - name: EKOKUBE_CLICKHOUSE_URL
+              value: "http://clickhouse.ekokube.svc:8123"
+            - name: RUST_LOG
+              value: "info"
+          volumeMounts:
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: true
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory

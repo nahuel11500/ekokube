@@ -1,0 +1,50 @@
+# Single-node ClickHouse for in-kind e2e testing (NOT for production —
+# use the official operator, see deploy/clickhouse/).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ekokube
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  namespace: ekokube
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: clickhouse }
+  template:
+    metadata:
+      labels: { app: clickhouse }
+    spec:
+      containers:
+        - name: clickhouse
+          image: clickhouse/clickhouse-server:24.8
+          env:
+            - name: CLICKHOUSE_SKIP_USER_SETUP
+              value: "1"
+          ports:
+            - containerPort: 8123
+            - containerPort: 9000
+          volumeMounts:
+            - name: schema
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: schema
+          configMap:
+            name: clickhouse-schema
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: ekokube
+spec:
+  selector: { app: clickhouse }
+  ports:
+    - name: http
+      port: 8123
+    - name: native
+      port: 9000
