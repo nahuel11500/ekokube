@@ -208,6 +208,26 @@ pub async fn effective_window_secs(
     query: &RangeQuery,
 ) -> Result<f64, ApiError> {
     let (from, to) = query.pod_range();
+
+    // Exact probe first: raw node_usage records precisely when agents were
+    // collecting (one narrow row per node per cycle — cheap to min/max even
+    // at fleet scale, unlike raw pod_usage).
+    let raw: Coverage = ch
+        .query(
+            "SELECT toUInt32(min(ts)) AS mn, toUInt32(max(ts)) AS mx, count() AS cnt \
+             FROM node_usage WHERE ts >= toDateTime(?) AND ts < toDateTime(?)",
+        )
+        .bind(from)
+        .bind(to)
+        .fetch_one()
+        .await?;
+    if raw.cnt > 0 {
+        let start = raw.mn.max(from);
+        let end = raw.mx.min(to).max(start);
+        return Ok((end.saturating_sub(start) as f64).max(60.0));
+    }
+
+    // Range predates the raw TTL: approximate from rollup buckets (±1 bucket).
     let (table, col) = query.pod_source();
     let bucket = query.bucket_secs();
     let time_expr = if col == "day" {
