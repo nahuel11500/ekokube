@@ -58,7 +58,7 @@ agent:
   enabled: true
   image:
     repository: ghcr.io/nahuel11500/ekokube-agent
-    tag: 0.2.0 # x-release-please-version
+    tag: 0.3.0 # x-release-please-version
     pullPolicy: IfNotPresent
   intervalSeconds: 15
   metaIntervalSeconds: 30
@@ -84,7 +84,7 @@ server:
   enabled: true
   image:
     repository: ghcr.io/nahuel11500/ekokube-server
-    tag: 0.2.0 # x-release-please-version
+    tag: 0.3.0 # x-release-please-version
     pullPolicy: IfNotPresent
   replicas: 1
   syncIntervalSeconds: 60

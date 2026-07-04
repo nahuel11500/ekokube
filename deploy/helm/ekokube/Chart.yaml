@@ -2,5 +2,5 @@ apiVersion: v2
 name: ekokube
 description: Kubernetes resource analytics — usage, waste, chargeback on ClickHouse. Deploys the agent, server/UI, ClickHouse cluster CRs, and schema. Install the ClickHouse operator as a separate release first (see README).
 type: application
-version: 0.2.0 # x-release-please-version
-appVersion: "0.2.0" # x-release-please-version
+version: 0.3.0 # x-release-please-version
+appVersion: "0.3.0" # x-release-please-version
