@@ -21,6 +21,10 @@ clickhouse:
   keeper:
     replicas: null
     storage: 10Gi
+    # Pinned Keeper image (operator default is :latest).
+    image:
+      repository: clickhouse/clickhouse-keeper
+      tag: "25.8"
   # Size for your retention: raw 14d, hourly rollups 400d, daily 1100d.
   storage: 200Gi
   storageClassName: ""

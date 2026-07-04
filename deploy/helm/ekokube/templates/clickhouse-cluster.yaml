@@ -11,6 +11,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ include "ekokube.keeperReplicas" . }}
+  containerTemplate:
+    # Pin the image (operator default is :latest).
+    image:
+      repository: {{ .Values.clickhouse.keeper.image.repository }}
+      tag: {{ .Values.clickhouse.keeper.image.tag | quote }}
   dataVolumeClaimSpec:
     {{- with .Values.clickhouse.storageClassName }}
     storageClassName: {{ . }}

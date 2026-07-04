@@ -34,10 +34,11 @@ function withAlpha(hex: string, alpha: number): string {
 export function TimeSeriesChart({ ts, series, unit, height = 220 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlot | null>(null)
+  const empty = ts.length === 0
 
   useEffect(() => {
     const wrap = wrapRef.current
-    if (!wrap) return
+    if (!wrap || empty) return
 
     const fmt = unit === 'cores' ? fmtCores : fmtBytes
     const axisColor = cssColor('--text-muted')
@@ -94,7 +95,14 @@ export function TimeSeriesChart({ ts, series, unit, height = 220 }: Props) {
       plotRef.current?.destroy()
       plotRef.current = null
     }
-  }, [ts, series, unit, height])
+  }, [ts, series, unit, height, empty])
 
+  if (empty) {
+    return (
+      <div className="empty" style={{ height }}>
+        No data in this time range
+      </div>
+    )
+  }
   return <div className="uplot-wrap" ref={wrapRef} />
 }
