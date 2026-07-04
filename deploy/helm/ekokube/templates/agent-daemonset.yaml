@@ -7,6 +7,12 @@ metadata:
   labels:
     app.kubernetes.io/name: ekokube-agent
 spec:
+  updateStrategy:
+    rollingUpdate:
+      # With the default (1), a single unschedulable pod — e.g. one
+      # capacity-starved node — permanently consumes the unavailability
+      # budget and freezes every subsequent rollout.
+      maxUnavailable: {{ .Values.agent.maxUnavailable }}
   selector:
     matchLabels:
       app.kubernetes.io/name: ekokube-agent

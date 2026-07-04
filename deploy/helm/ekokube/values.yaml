@@ -66,6 +66,10 @@ agent:
   metricsPort: 9090
   # Max rows buffered in memory while ClickHouse is unreachable (drop-oldest beyond).
   bufferMaxRows: 250000
+  # Rolling-update budget. A percentage keeps rollouts moving even when some
+  # pods are unschedulable (full nodes); the agent is stateless so brief
+  # per-node gaps only pause that node's sampling.
+  maxUnavailable: 25%
   resources:
     requests:
       cpu: 50m
