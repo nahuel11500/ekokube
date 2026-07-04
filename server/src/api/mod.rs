@@ -210,11 +210,13 @@ pub async fn effective_window_secs(
     let (from, to) = query.pod_range();
 
     // Exact probe first: raw node_usage records precisely when agents were
-    // collecting (one narrow row per node per cycle — cheap to min/max even
-    // at fleet scale, unlike raw pod_usage).
+    // collecting (one narrow row per node per cycle — cheap to scan even at
+    // fleet scale, unlike raw pod_usage). Counting distinct collection
+    // minutes (not the min→max span) keeps gaps — agent downtime, ClickHouse
+    // outages past the buffer — out of the denominator.
     let raw: Coverage = ch
         .query(
-            "SELECT toUInt32(min(ts)) AS mn, toUInt32(max(ts)) AS mx, count() AS cnt \
+            "SELECT toUInt32(uniqExact(toStartOfMinute(ts)) * 60) AS mn, toUInt32(0) AS mx, count() AS cnt \
              FROM node_usage WHERE ts >= toDateTime(?) AND ts < toDateTime(?)",
         )
         .bind(from)
@@ -222,9 +224,7 @@ pub async fn effective_window_secs(
         .fetch_one()
         .await?;
     if raw.cnt > 0 {
-        let start = raw.mn.max(from);
-        let end = raw.mx.min(to).max(start);
-        return Ok((end.saturating_sub(start) as f64).max(60.0));
+        return Ok((raw.mn as f64).max(60.0));
     }
 
     // Range predates the raw TTL: approximate from rollup buckets (±1 bucket).
