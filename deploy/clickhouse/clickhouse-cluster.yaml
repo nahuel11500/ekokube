@@ -1,0 +1,41 @@
+# Standalone ClickHouse example for ekokube using the official operator
+# (github.com/ClickHouse/clickhouse-operator). NOTE: the ekokube Helm chart
+# creates these resources itself when clickhouse.managed=true — this file is
+# only for bring-your-own-ClickHouse setups (clickhouse.managed=false, with
+# clickhouse.host=ekokube-clickhouse-headless.<ns>.svc).
+#
+# Prerequisites:
+#   - cert-manager (operator webhook certificates)
+#   - the operator:
+#       helm install clickhouse-operator oci://ghcr.io/clickhouse/clickhouse-operator-helm
+#
+# The operator exposes the cluster via a headless service named
+# <name>-clickhouse-headless (HTTP 8123, native 9000).
+#
+# Size storage for your retention: raw samples are kept 14 days, hourly
+# rollups 400 days, daily rollups 1100 days (see deploy/schema/).
+apiVersion: clickhouse.com/v1alpha1
+kind: KeeperCluster
+metadata:
+  name: ekokube
+  namespace: ekokube
+spec:
+  replicas: 3
+  dataVolumeClaimSpec:
+    resources:
+      requests:
+        storage: 10Gi
+---
+apiVersion: clickhouse.com/v1alpha1
+kind: ClickHouseCluster
+metadata:
+  name: ekokube
+  namespace: ekokube
+spec:
+  replicas: 2
+  dataVolumeClaimSpec:
+    resources:
+      requests:
+        storage: 200Gi
+  keeperClusterRef:
+    name: ekokube

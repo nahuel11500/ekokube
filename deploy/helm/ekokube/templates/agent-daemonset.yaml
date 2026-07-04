@@ -1,0 +1,82 @@
+{{- if .Values.agent.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ekokube-agent
+spec:
+  updateStrategy:
+    rollingUpdate:
+      # With the default (1), a single unschedulable pod — e.g. one
+      # capacity-starved node — permanently consumes the unavailability
+      # budget and freezes every subsequent rollout.
+      maxUnavailable: {{ .Values.agent.maxUnavailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ekokube-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ekokube-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.agent.metricsPort | quote }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-agent
+      {{- with .Values.agent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          env:
+            - name: EKOKUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: EKOKUBE_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: EKOKUBE_KUBELET_URL
+              value: "https://$(EKOKUBE_NODE_IP):10250"
+            - name: EKOKUBE_KUBELET_INSECURE_TLS
+              value: {{ .Values.agent.kubeletInsecureTls | quote }}
+            - name: EKOKUBE_INTERVAL_SECS
+              value: {{ .Values.agent.intervalSeconds | quote }}
+            - name: EKOKUBE_META_INTERVAL_SECS
+              value: {{ .Values.agent.metaIntervalSeconds | quote }}
+            - name: EKOKUBE_METRICS_ADDR
+              value: "0.0.0.0:{{ .Values.agent.metricsPort }}"
+            - name: EKOKUBE_BUFFER_MAX_ROWS
+              value: {{ .Values.agent.bufferMaxRows | quote }}
+            {{- include "ekokube.clickhouseEnv" . | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.agent.metricsPort }}
+              name: metrics
+          volumeMounts:
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: true
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+
+{{- end }}

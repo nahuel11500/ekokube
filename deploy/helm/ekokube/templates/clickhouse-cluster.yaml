@@ -1,0 +1,62 @@
+{{- if .Values.clickhouse.managed }}
+{{/*
+Plain templates (no hook). The ClickHouse operator is a separate Helm release
+installed first, so its CRDs already exist when this release is applied; the
+operator then reconciles these CRs. See deploy/install.sh.
+*/}}
+apiVersion: clickhouse.com/v1alpha1
+kind: KeeperCluster
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ include "ekokube.keeperReplicas" . }}
+  containerTemplate:
+    # Pin the image (operator default is :latest).
+    image:
+      repository: {{ .Values.clickhouse.keeper.image.repository }}
+      tag: {{ .Values.clickhouse.keeper.image.tag | quote }}
+  dataVolumeClaimSpec:
+    {{- with .Values.clickhouse.storageClassName }}
+    storageClassName: {{ . }}
+    {{- end }}
+    resources:
+      requests:
+        storage: {{ .Values.clickhouse.keeper.storage }}
+---
+apiVersion: clickhouse.com/v1alpha1
+kind: ClickHouseCluster
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ include "ekokube.clickhouseReplicas" . }}
+  keeperClusterRef:
+    name: {{ .Release.Name }}
+  dataVolumeClaimSpec:
+    {{- with .Values.clickhouse.storageClassName }}
+    storageClassName: {{ . }}
+    {{- end }}
+    resources:
+      requests:
+        storage: {{ .Values.clickhouse.storage }}
+  containerTemplate:
+    # Pin the image (operator default is :latest, a pre-release).
+    image:
+      repository: {{ .Values.clickhouse.image.repository }}
+      tag: {{ .Values.clickhouse.image.tag | quote }}
+    {{- with .Values.clickhouse.resources }}
+    # The operator defaults the container to a 512Mi limit — too small to run
+    # real queries. ClickHouse sizes max_server_memory_usage from this limit.
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  settings:
+    extraUsersConfig:
+      users:
+        {{ .Values.clickhouse.auth.username }}:
+          password_sha256_hex: {{ include "ekokube.passwordSha256" . | quote }}
+          profile: default
+          grants:
+            - query: "GRANT CREATE DATABASE, CREATE TABLE, CREATE VIEW, SELECT, INSERT, ALTER, DROP, TRUNCATE, OPTIMIZE, SHOW ON {{ .Values.clickhouse.database }}.*"
+{{- end }}

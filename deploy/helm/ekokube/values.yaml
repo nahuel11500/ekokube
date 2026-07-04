@@ -1,0 +1,125 @@
+clickhouse:
+  # Create the official-operator ClickHouse CRs from this chart (plain
+  # templates; the operator reconciles them). Requires the official ClickHouse
+  # operator installed first, scoped to this namespace (see deploy/install.sh).
+  # Set false to bring your own ClickHouse (set clickhouse.host).
+  managed: true
+
+  # Pinned ClickHouse image. The operator otherwise defaults to :latest (a
+  # pre-release) — never run that in production. 25.8 is the current LTS line;
+  # override with a fully-qualified tag (e.g. 25.8.27.1) for full reproducibility.
+  image:
+    repository: clickhouse/clickhouse-server
+    tag: "25.8"
+
+  # false: 1 ClickHouse + 1 Keeper (dev/small). true: 2 ClickHouse + 3 Keepers,
+  # and the schema database is created with the Replicated engine so tables
+  # replicate across both replicas.
+  ha: false
+  # Explicit replica overrides (take precedence over the ha presets).
+  replicas: null
+  keeper:
+    replicas: null
+    storage: 10Gi
+    # Pinned Keeper image (operator default is :latest).
+    image:
+      repository: clickhouse/clickhouse-keeper
+      tag: "25.8"
+  # Size for your retention: raw 14d, hourly rollups 400d, daily 1100d.
+  storage: 200Gi
+  storageClassName: ""
+  # ClickHouse container resources. The operator defaults to a 512Mi limit,
+  # which is too small to run real queries — set a sane floor here. ClickHouse
+  # sizes max_server_memory_usage from the memory limit, so raise it for
+  # larger clusters.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      memory: 2Gi
+
+  auth:
+    username: ekokube
+    # CHANGE THIS IN PRODUCTION (or use existingSecret).
+    password: "ekokube"
+    # Existing Secret with a `password` key. When set, passwordSha256 must
+    # hold sha256(password) in hex (the CR carries only the hash).
+    existingSecret: ""
+    passwordSha256: ""
+
+  # Connection overrides; leave empty for a managed cluster (derived).
+  host: ""
+  httpPort: 8123
+  nativePort: 9000
+  database: ekokube
+
+agent:
+  enabled: true
+  image:
+    repository: ghcr.io/nahuel11500/ekokube-agent
+    tag: 0.2.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  intervalSeconds: 15
+  metaIntervalSeconds: 30
+  kubeletInsecureTls: true
+  metricsPort: 9090
+  # Max rows buffered in memory while ClickHouse is unreachable (drop-oldest beyond).
+  bufferMaxRows: 250000
+  # Rolling-update budget. A percentage keeps rollouts moving even when some
+  # pods are unschedulable (full nodes); the agent is stateless so brief
+  # per-node gaps only pause that node's sampling.
+  maxUnavailable: 25%
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 384Mi
+  tolerations:
+    - operator: Exists # run on every node, control plane included
+  nodeSelector: {}
+
+server:
+  enabled: true
+  image:
+    repository: ghcr.io/nahuel11500/ekokube-server
+    tag: 0.2.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  replicas: 1
+  syncIntervalSeconds: 60
+  # HTTP Basic Auth for the UI + API (browser login prompt). On by default —
+  # CHANGE THE PASSWORD. /api/health, /api/health/ready and /metrics stay open
+  # for probes and Prometheus.
+  auth:
+    enabled: true
+    username: admin
+    password: "ekokube"
+    # Secret with a `password` key; overrides `password` when set.
+    existingSecret: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: false
+    className: ""
+    host: ""
+    annotations: {}
+    tls: [] # standard ingress tls block
+
+monitoring:
+  # PodMonitor (agent) + ServiceMonitor (server); needs prometheus-operator.
+  serviceMonitor:
+    enabled: false
+
+# Applies deploy/schema/*.sql on install/upgrade (idempotent DDL); creates the
+# database first (Replicated engine when clickhouse.ha=true).
+schemaMigration:
+  enabled: true
+  image: clickhouse/clickhouse-server:24.8

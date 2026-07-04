@@ -1,0 +1,76 @@
+{{- if .Values.server.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ekokube-server
+spec:
+  replicas: {{ .Values.server.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ekokube-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ekokube-server
+    spec:
+      serviceAccountName: {{ .Release.Name }}-server
+      containers:
+        - name: server
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          env:
+            - name: EKOKUBE_LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: EKOKUBE_SYNC_INTERVAL_SECS
+              value: {{ .Values.server.syncIntervalSeconds | quote }}
+            {{- if .Values.server.auth.enabled }}
+            - name: EKOKUBE_AUTH_USERNAME
+              value: {{ .Values.server.auth.username | quote }}
+            - name: EKOKUBE_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.server.auth.existingSecret | default (printf "%s-server-auth" .Release.Name) }}
+                  key: password
+            {{- end }}
+            {{- include "ekokube.clickhouseEnv" . | nindent 12 }}
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            # Readiness requires ClickHouse to answer.
+            httpGet:
+              path: /api/health/ready
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ekokube-server
+spec:
+  type: {{ .Values.server.service.type }}
+  selector:
+    app.kubernetes.io/name: ekokube-server
+  ports:
+    - port: {{ .Values.server.service.port }}
+      targetPort: http
+      name: http
+
+{{- end }}
