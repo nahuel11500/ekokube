@@ -7,7 +7,7 @@ use axum::Json;
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{ApiError, AppState, RangeQuery};
+use super::{effective_window_secs, ApiError, AppState, RangeQuery};
 
 #[derive(Row, Deserialize)]
 struct NodeStat {
@@ -82,7 +82,7 @@ pub async fn handler(
 
     // Requested totals per node come from the pod rollup (daily for long ranges).
     let (from, to) = query.pod_range();
-    let window = query.window_secs();
+    let window = effective_window_secs(&state.ch, &query).await?;
     let (table, _) = query.pod_source();
     let where_clause = query.pod_where();
     let requested_sql = format!(

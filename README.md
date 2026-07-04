@@ -184,6 +184,13 @@ Notes:
 Issues and PRs welcome. `cargo fmt && cargo clippy --all-targets && cargo test`
 plus `dev/smoke-test.sh` should pass; CI runs the same checks.
 
+- **Conventional commits** are required (`feat:`, `fix:`, `chore:`, …) and
+  linted in CI (commitlint).
+- **Releases are automated** with release-please: merging the release PR bumps
+  Cargo.toml / Chart.yaml / image tags, updates the CHANGELOG, tags `vX.Y.Z`,
+  and the release workflow publishes matching images to ghcr.
+- **Dependencies** are kept fresh by Renovate (grouped non-major PRs).
+
 ## License
 
 [Apache-2.0](LICENSE)

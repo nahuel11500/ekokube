@@ -156,6 +156,15 @@ impl RangeQuery {
         (to - from) as f64
     }
 
+    /// Rollup bucket width in seconds for the selected pod source.
+    pub fn bucket_secs(&self) -> u32 {
+        if self.use_daily() {
+            24 * 3600
+        } else {
+            3600
+        }
+    }
+
     pub fn limit(&self) -> u32 {
         self.limit.unwrap_or(50).min(500)
     }
@@ -178,6 +187,46 @@ impl RangeQuery {
         };
         format!("{column} {order}")
     }
+}
+
+#[derive(clickhouse::Row, serde::Deserialize)]
+struct Coverage {
+    mn: u32,
+    mx: u32,
+    cnt: u64,
+}
+
+/// Denominator for "average concurrent" columns: the part of the requested
+/// window actually covered by data. On a fresh install, dividing by the full
+/// window dilutes requests/usage/waste to near zero (a 1-core request shows
+/// as ~20mc after 30 minutes of collection in a 24h view) — misleading, since
+/// requests are a setting, not consumption. Once data spans the whole window
+/// this equals window_secs(), so long-running installs are unaffected.
+/// Chargeback core-hours are absolute sums and never touch this.
+pub async fn effective_window_secs(
+    ch: &clickhouse::Client,
+    query: &RangeQuery,
+) -> Result<f64, ApiError> {
+    let (from, to) = query.pod_range();
+    let (table, col) = query.pod_source();
+    let bucket = query.bucket_secs();
+    let time_expr = if col == "day" {
+        format!("toDateTime({col})")
+    } else {
+        col.to_string()
+    };
+    let sql = format!(
+        "SELECT toUInt32(min({time_expr})) AS mn, toUInt32(max({time_expr})) AS mx, count() AS cnt \
+         FROM {table} WHERE {}",
+        query.pod_where()
+    );
+    let coverage: Coverage = ch.query(&sql).bind(from).bind(to).fetch_one().await?;
+    if coverage.cnt == 0 {
+        return Ok(query.window_secs());
+    }
+    let start = coverage.mn.max(from);
+    let end = (coverage.mx + bucket).min(to.max(start + 60));
+    Ok((end.saturating_sub(start) as f64).max(60.0))
 }
 
 /// Picks a bucket size (seconds) targeting ~360 points, and whether the raw

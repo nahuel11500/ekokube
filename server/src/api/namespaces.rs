@@ -5,7 +5,7 @@ use axum::Json;
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{ApiError, AppState, RangeQuery};
+use super::{effective_window_secs, ApiError, AppState, RangeQuery};
 
 const SORT_COLUMNS: &[&str] = &[
     "cpu_usage_avg",
@@ -54,7 +54,7 @@ pub async fn handler(
     Query(query): Query<RangeQuery>,
 ) -> Result<Json<NamespacesResponse>, ApiError> {
     let (from, to) = query.pod_range();
-    let window = query.window_secs();
+    let window = effective_window_secs(&state.ch, &query).await?;
     let sort = query.sort_sql(SORT_COLUMNS, "cpu_usage_avg");
     let limit = query.limit();
     let (table, _) = query.pod_source();
